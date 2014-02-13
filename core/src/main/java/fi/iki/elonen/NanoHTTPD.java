@@ -184,6 +184,7 @@ public abstract class NanoHTTPD {
                                     outputStream = finalAccept.getOutputStream();
                                     TempFileManager tempFileManager = tempFileManagerFactory.create();
                                     HTTPSession session = new HTTPSession(tempFileManager, inputStream, outputStream, finalAccept.getInetAddress());
+									session.socket = finalAccept;
                                     while (!finalAccept.isClosed()) {
                                         session.execute();
                                     }
@@ -546,6 +547,8 @@ public abstract class NanoHTTPD {
      * HTTP response. Return one of these from serve().
      */
     public static class Response {
+
+		private Socket outputSocket;
         /**
          * HTTP status code after processing, e.g. "200 OK", HTTP_OK
          */
@@ -648,6 +651,8 @@ public abstract class NanoHTTPD {
                 safeClose(data);
             } catch (IOException ioe) {
                 // Couldn't write? No can do.
+				safeClose(data);
+				safeClose(outputStream);
             }
         }
 
@@ -663,6 +668,7 @@ public abstract class NanoHTTPD {
                 outputStream.write(String.format("%x\r\n", read).getBytes());
                 outputStream.write(buff, 0, read);
                 outputStream.write(CRLF);
+				outputStream.flush();
             }
             outputStream.write(String.format("0\r\n\r\n").getBytes());
         }
@@ -811,7 +817,8 @@ public abstract class NanoHTTPD {
     }
 
     protected class HTTPSession implements IHTTPSession {
-        public static final int BUFSIZE = 8192;
+		private Socket socket;
+		public static final int BUFSIZE = 8192;
         private final TempFileManager tempFileManager;
         private final OutputStream outputStream;
         private PushbackInputStream inputStream;
@@ -905,6 +912,7 @@ public abstract class NanoHTTPD {
                 if (r == null) {
                     throw new ResponseException(Response.Status.INTERNAL_ERROR, "SERVER INTERNAL ERROR: Serve() returned a null response.");
                 } else {
+					r.outputSocket = socket;
                     cookies.unloadQueue(r);
                     r.setRequestMethod(method);
                     r.send(outputStream);
