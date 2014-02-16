@@ -653,7 +653,11 @@ public abstract class NanoHTTPD {
                 // Couldn't write? No can do.
 				safeClose(data);
 				safeClose(outputStream);
-            }
+			} catch (Throwable e) {
+				safeClose(data);
+				safeClose(outputStream);
+				throw new Error(e);
+			}
         }
 
         private void sendAsChunked(OutputStream outputStream, PrintWriter pw) throws IOException {
